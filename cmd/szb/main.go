@@ -111,9 +111,6 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 			panic(err)
 		}
 
-		memUsed := humanreadable.BiBytes(memStat.Used)
-		memFree := humanreadable.BiBytes(memStat.Free)
-
 		uptime, err := uptime.Get()
 		if err != nil {
 			panic(err)
@@ -121,8 +118,15 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 		dbuff.SetLine1(now.Format("2006/01/02  15:04:05"))
 		dbuff.SetLine3(
-			fmt.Sprintf("mem.used: %s, mem.free: %s, cpu.usr: %.1f%%, cpu.sys: %.1f%%, cpu.idle: %.1f%%, up: %v",
-				memUsed, memFree, usrCpu, sysCpu, idlCpu, humanreadable.Second(uptime)),
+			fmt.Sprintf("mem.total:%s, mem.avail:%s, mem.cached:%s, mem.act:%s, mem.inact:%s, mem.free:%s, cpu.usr:%.1f%%, cpu.sys:%.1f%%, cpu.idle:%.1f%%, up:%v",
+				humanreadable.BiBytes(memStat.Total),
+				humanreadable.BiBytes(memStat.Available),
+				humanreadable.BiBytes(memStat.Cached),
+				humanreadable.BiBytes(memStat.Active),
+				humanreadable.BiBytes(memStat.Inactive),
+				humanreadable.BiBytes(memStat.Free),
+				usrCpu, sysCpu, idlCpu,
+				humanreadable.Second(uptime)),
 		)
 
 		if scanner.Scan() && scanner.Text() == CMD_PROMPT {
