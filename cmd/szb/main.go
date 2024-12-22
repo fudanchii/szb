@@ -9,15 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/fudanchii/szb/internal/display"
+	"github.com/fudanchii/szb/internal/humanreadable"
 	"github.com/mackerelio/go-osstat/cpu"
 	"github.com/mackerelio/go-osstat/memory"
 	"github.com/mackerelio/go-osstat/uptime"
 	"go.bug.st/serial"
 )
 
-const CMD_PROMPT = "$>:"
+const (
+	CMD_PROMPT      = "$>:"
+	DISPLAY_RATE_MS = 100
+	STATS_RATE_MS   = 1000
+)
 
 type configStruct struct {
 	baudRate      int
@@ -107,8 +111,8 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 			panic(err)
 		}
 
-		memUsed := humanize.IBytes(memStat.Used)
-		memFree := humanize.IBytes(memStat.Free)
+		memUsed := humanreadable.BiBytes(memStat.Used)
+		memFree := humanreadable.BiBytes(memStat.Free)
 
 		uptime, err := uptime.Get()
 		if err != nil {
@@ -117,8 +121,8 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 		dbuff.SetLine1(now.Format("2006/01/02  15:04:05"))
 		dbuff.SetLine3(
-			fmt.Sprintf("mem used: %s, mem free: %s, cpu.usr: %.1f%%, cpu.sys: %.1f%%, cpu.idl: %.1f%%, up: %v",
-				memUsed, memFree, usrCpu, sysCpu, idlCpu, uptime),
+			fmt.Sprintf("mem.used: %s, mem.free: %s, cpu.usr: %.1f%%, cpu.sys: %.1f%%, cpu.idle: %.1f%%, up: %v",
+				memUsed, memFree, usrCpu, sysCpu, idlCpu, humanreadable.Second(uptime)),
 		)
 
 		if scanner.Scan() && scanner.Text() == CMD_PROMPT {
@@ -126,12 +130,12 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 			tty.Write([]byte(cmd))
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(DISPLAY_RATE_MS * time.Millisecond)
 		}
 
 		statsCounter++
 
-		if statsCounter >= 2 {
+		if statsCounter >= (STATS_RATE_MS / DISPLAY_RATE_MS) {
 			prevCpu = currCpu
 			currCpu, err = cpu.Get()
 			if err != nil {
