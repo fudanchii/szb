@@ -126,7 +126,7 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 			tty.Write([]byte(cmd))
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		statsCounter++

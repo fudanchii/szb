@@ -3,6 +3,7 @@ package display
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -21,10 +22,17 @@ type OverflowStyle interface {
 	setLine4(string) error
 }
 
+func tryParseIntParam(value string) (int, error) {
+	splits := strings.Split(value, ":")
+	if len(splits) == 2 {
+		return strconv.Atoi(splits[1])
+	}
+
+	return 1, nil
+}
+
 func TryParseCustomStyle(flag string) ([4]NoWrapOverflowStyle, error) {
-	var (
-		line [4]NoWrapOverflowStyle
-	)
+	var line [4]NoWrapOverflowStyle
 
 	flags := strings.Split(flag, ",")
 	if len(flags) != 4 {
@@ -32,13 +40,23 @@ func TryParseCustomStyle(flag string) ([4]NoWrapOverflowStyle, error) {
 	}
 
 	for idx := range flags {
-		switch flags[idx] {
-		case "t":
+		switch {
+		case flags[idx] == "t":
 			line[idx] = &OfTrimLine{}
-		case "em":
-			line[idx] = &OfEndlessMarquee{}
-		case "cm":
-			line[idx] = &OfCycleMarquee{}
+		case strings.HasPrefix(flags[idx], "em"):
+			renderRate, err := tryParseIntParam(flags[idx])
+			if err != nil {
+				return line, err
+			}
+
+			line[idx] = &OfEndlessMarquee{rate: renderRate}
+		case strings.HasPrefix(flags[idx], "cm"):
+			renderRate, err := tryParseIntParam(flags[idx])
+			if err != nil {
+				return line, err
+			}
+
+			line[idx] = &OfCycleMarquee{rate: renderRate}
 		default:
 			return line, fmt.Errorf("style parse: error invalid style for line%d", idx)
 		}
@@ -80,9 +98,18 @@ type OfEndlessMarquee struct {
 	line     string
 	nextLine string
 	pos      int
+
+	counter, rate int
+	rendered      bool
 }
 
 func (oem *OfEndlessMarquee) NextRender(currentBuffer []byte) {
+	if oem.rendered && oem.counter < oem.rate {
+		oem.counter++
+		return
+	}
+
+	oem.counter = 0
 	trailer := ""
 	endPos := oem.pos + 20
 	if endPos >= len(oem.line) {
@@ -97,6 +124,8 @@ func (oem *OfEndlessMarquee) NextRender(currentBuffer []byte) {
 		oem.line = oem.nextLine
 		oem.pos = 0
 	}
+
+	oem.rendered = true
 }
 
 func (oem *OfEndlessMarquee) setCurrentLine(line string) {
@@ -114,18 +143,29 @@ func (oem *OfEndlessMarquee) setCurrentLine(line string) {
 type OfCycleMarquee struct {
 	BaseNoWrapOverflowStyle
 
-	slideLeft bool
-	line      string
-	nextLine  string
-	pos       int
-	changed   bool
+	slideLeft         bool
+	line              string
+	nextLine          string
+	pos               int
+	changed, rendered bool
+
+	counter, rate int
 }
 
 func (ocm *OfCycleMarquee) NextRender(currentBuffer []byte) {
+	if ocm.rendered && ocm.counter < ocm.rate {
+		ocm.counter++
+		return
+	}
+
+	ocm.counter = 0
+
 	if ocm.changed && len(ocm.nextLine) == 20 {
 		copy(currentBuffer[:], ocm.nextLine[:20])
+
 		ocm.line = ocm.nextLine
 		ocm.changed = false
+
 		return
 	}
 
@@ -146,6 +186,8 @@ func (ocm *OfCycleMarquee) NextRender(currentBuffer []byte) {
 			ocm.line = ocm.nextLine
 		}
 	}
+
+	ocm.rendered = true
 }
 
 func (ocm *OfCycleMarquee) setCurrentLine(line string) {
