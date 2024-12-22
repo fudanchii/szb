@@ -21,12 +21,14 @@ const (
 	CMD_PROMPT      = "$>:"
 	DISPLAY_RATE_MS = 100
 	STATS_RATE_MS   = 1000
+	ONE_MINUTE      = 60
 )
 
 type configStruct struct {
-	baudRate      int
-	connectTo     string
-	overflowStyle string
+	baudRate               int
+	connectTo              string
+	overflowStyle          string
+	dayOfWeekDisplayPeriod int
 }
 
 var (
@@ -35,6 +37,7 @@ var (
 
 func init() {
 	flag.IntVar(&config.baudRate, "b", 115200, "Baudrate for the serial line.")
+	flag.IntVar(&config.dayOfWeekDisplayPeriod, "d", 20, "How long day of week should be displayed in alternate with full date.")
 	flag.StringVar(&config.connectTo, "c", "/dev/ttyACM0", "Device name to connect to.")
 	flag.StringVar(&config.overflowStyle, "o", "wrap", "Overflow style when text line is longer than 20 characters.")
 }
@@ -89,6 +92,8 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 		panic(err)
 	}
 
+	showDayOfWeekTicker := 0
+
 	statsCounter := 0
 
 	for {
@@ -116,7 +121,17 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 			panic(err)
 		}
 
-		dbuff.SetLine1(now.Format("2006/01/02  15:04:05"))
+		if showDayOfWeekTicker > (ONE_MINUTE-config.dayOfWeekDisplayPeriod)*10 {
+			dbuff.SetLine1(fmt.Sprintf("%-12s%s", now.Format("Monday"), now.Format("15:04:05")))
+			if showDayOfWeekTicker > ONE_MINUTE*10 {
+				showDayOfWeekTicker = 0
+			}
+		} else {
+			dbuff.SetLine1(now.Format("2006/01/02  15:04:05"))
+		}
+
+		showDayOfWeekTicker++
+
 		dbuff.SetLine3(
 			fmt.Sprintf("mem.total:%s, mem.avail:%s, mem.cached:%s, mem.act:%s, mem.inact:%s, mem.free:%s, cpu.usr:%.1f%%, cpu.sys:%.1f%%, cpu.idle:%.1f%%, up:%v",
 				humanreadable.BiBytes(memStat.Total),
