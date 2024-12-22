@@ -122,11 +122,11 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 		)
 
 		if scanner.Scan() && scanner.Text() == CMD_PROMPT {
-			time.Sleep(500 * time.Millisecond)
-
 			cmd := fmt.Sprintf("display:%s\n", dbuff.NextRender())
 
 			tty.Write([]byte(cmd))
+
+			time.Sleep(500 * time.Millisecond)
 		}
 
 		statsCounter++
