@@ -76,7 +76,7 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 				addrsList = append(addrsList, addr.String())
 			}
 
-			ifaceList = append(ifaceList, fmt.Sprintf("%s~%s", iface.Name, strings.Join(addrsList, ",")))
+			ifaceList = append(ifaceList, fmt.Sprintf("%s~%s", iface.Name, strings.Join(addrsList, ", ")))
 		}
 
 		dbuff.SetLine4(strings.Join(ifaceList, " | "))
