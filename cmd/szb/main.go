@@ -11,6 +11,7 @@ import (
 
 	"github.com/fudanchii/szb/internal/display"
 	"github.com/fudanchii/szb/internal/humanreadable"
+	"github.com/fudanchii/szb/internal/sysstats"
 	"github.com/mackerelio/go-osstat/cpu"
 	"github.com/mackerelio/go-osstat/memory"
 	"github.com/mackerelio/go-osstat/uptime"
@@ -29,6 +30,7 @@ type configStruct struct {
 	connectTo              string
 	overflowStyle          string
 	dayOfWeekDisplayPeriod int
+	timezone               string
 }
 
 var (
@@ -40,6 +42,7 @@ func init() {
 	flag.IntVar(&config.dayOfWeekDisplayPeriod, "d", 20, "How long day of week should be displayed in alternate with full date.")
 	flag.StringVar(&config.connectTo, "c", "/dev/ttyACM0", "Device name to connect to.")
 	flag.StringVar(&config.overflowStyle, "o", "wrap", "Overflow style when text line is longer than 20 characters.")
+	flag.StringVar(&config.timezone, "t", "UTC", "Timezone local to use when displaying date time.")
 }
 
 func run(tty serial.Port, dbuff *display.Buffer) {
@@ -47,7 +50,11 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 	scanner.Split(bufio.ScanWords)
 
-	loc, err := time.LoadLocation("Asia/Tokyo")
+	timeDate, err := sysstats.NewDateTime(
+		config.timezone,
+		DISPLAY_RATE_MS,
+		config.dayOfWeekDisplayPeriod,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -92,12 +99,10 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 		panic(err)
 	}
 
-	showDayOfWeekTicker := 0
-
 	statsCounter := 0
 
 	for {
-		now := time.Now().In(loc)
+		dbuff.SetLine1(timeDate.String())
 
 		cpuTotal := float64(currCpu.Total - prevCpu.Total)
 
@@ -120,17 +125,6 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 		if err != nil {
 			panic(err)
 		}
-
-		if showDayOfWeekTicker > (ONE_MINUTE-config.dayOfWeekDisplayPeriod)*10 {
-			dbuff.SetLine1(fmt.Sprintf("%-12s%s", now.Format("Monday"), now.Format("15:04:05")))
-			if showDayOfWeekTicker > ONE_MINUTE*10 {
-				showDayOfWeekTicker = 0
-			}
-		} else {
-			dbuff.SetLine1(now.Format("2006/01/02  15:04:05"))
-		}
-
-		showDayOfWeekTicker++
 
 		dbuff.SetLine3(
 			fmt.Sprintf("mem.total:%s, mem.avail:%s, mem.cached:%s, mem.act:%s, mem.inact:%s, mem.free:%s, cpu.usr:%.1f%%, cpu.sys:%.1f%%, cpu.idle:%.1f%%, up:%v",
