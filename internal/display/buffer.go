@@ -160,11 +160,13 @@ func (ocm *OfCycleMarquee) NextRender(currentBuffer []byte) {
 
 	ocm.counter = 0
 
-	if ocm.changed && len(ocm.nextLine) == 20 {
-		copy(currentBuffer[:], ocm.nextLine[:20])
+	if len(ocm.nextLine) == 20 {
+		if ocm.changed {
+			copy(currentBuffer[:], ocm.nextLine[:20])
 
-		ocm.line = ocm.nextLine
-		ocm.changed = false
+			ocm.line = ocm.nextLine
+			ocm.changed = false
+		}
 
 		return
 	}
@@ -177,8 +179,10 @@ func (ocm *OfCycleMarquee) NextRender(currentBuffer []byte) {
 	copy(currentBuffer[:], []byte(ocm.line[ocm.pos:endPos]))
 
 	if ocm.slideLeft {
-		ocm.pos += 1
 		ocm.slideLeft = endPos < len(ocm.line)
+		if ocm.slideLeft {
+			ocm.pos += 1
+		}
 	} else {
 		ocm.pos -= 1
 		ocm.slideLeft = ocm.pos == 0

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fudanchii/szb/internal/display"
@@ -50,6 +53,15 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 	scanner.Split(bufio.ScanWords)
 
+	stopRun := make(chan struct{})
+	osSignalCaptor := make(chan os.Signal, 1)
+	signal.Notify(osSignalCaptor, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-osSignalCaptor
+		close(stopRun)
+	}()
+
 	timeDate, err := sysstats.NewDateTime(
 		config.timezone,
 		DISPLAY_RATE_MS,
@@ -80,12 +92,13 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 
 			addrsList := []string{}
 			for _, addr := range addrs {
+				if strings.HasPrefix(addr.String(), "fe80") {
+					continue
+				}
 				addrsList = append(addrsList, addr.String())
 			}
-
 			ifaceList = append(ifaceList, fmt.Sprintf("%s~%s", iface.Name, strings.Join(addrsList, ", ")))
 		}
-
 		dbuff.SetLine4(strings.Join(ifaceList, " | "))
 	}
 
@@ -156,6 +169,13 @@ func run(tty serial.Port, dbuff *display.Buffer) {
 			}
 			statsCounter = 0
 		}
+
+		select {
+		case <-stopRun:
+			fmt.Println("Shutting down...")
+			return
+		default:
+		}
 	}
 }
 
@@ -168,6 +188,9 @@ func main() {
 	}
 
 	defer tty.Close()
+	defer func() {
+		tty.Write([]byte("clr\n"))
+	}()
 
 	switch config.overflowStyle {
 	case "wrap":
@@ -185,6 +208,7 @@ func main() {
 				lines[2],
 				lines[3],
 			),
-		))
+		),
+		)
 	}
 }

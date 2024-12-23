@@ -42,7 +42,7 @@ func (dt *DateTime) String() string {
 			dt.callCounter = 0
 		}
 
-		result = fmt.Sprintf("%-12s%s", now.Format("Monday"), now.Format("15:05:04"))
+		result = fmt.Sprintf("%-12s%s", now.Format("Monday"), now.Format("15:04:05"))
 	} else {
 		result = now.Format("2006-01-02  15:04:05")
 	}
