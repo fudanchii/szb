@@ -57,7 +57,8 @@ type AppHandler struct {
 }
 
 func main() {
-	err := kickstart.Init(setupFn).
+	err := kickstart.
+		Init(setupFn).
 		Loop(runFn).
 		Then(shutdownFn).
 		Exec()
@@ -68,16 +69,16 @@ func main() {
 }
 
 func setupFn(kctx *kickstart.Context[AppHandler]) error {
+	var (
+		buffer *display.Buffer
+	)
+
 	flag.Parse()
 
 	tty, err := serial.Open(config.connectTo, &serial.Mode{BaudRate: config.baudRate})
 	if err != nil {
 		return err
 	}
-
-	var (
-		buffer *display.Buffer
-	)
 
 	switch config.overflowStyle {
 	case "wrap":
@@ -108,7 +109,7 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 		config.dayOfWeekDisplayPeriod,
 	)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	buffer.SetLine2("")
@@ -116,14 +117,14 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 	{
 		ifaces, err := net.Interfaces()
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		ifaceList := []string{}
 		for _, iface := range ifaces {
 			addrs, err := iface.Addrs()
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			if iface.Name == "lo" || len(addrs) == 0 {
@@ -144,12 +145,12 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 
 	prevCpu, err := cpu.Get()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	currCpu, err := cpu.Get()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	statsCounter := 0
