@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"net"
-	"strings"
 	"time"
 
 	"github.com/fudanchii/szb/internal/display"
@@ -51,6 +49,7 @@ type AppHandler struct {
 	scanner *bufio.Scanner
 
 	datetime     *sysstats.DateTime
+	netStats     *sysstats.NetworkStats
 	prevCpu      *cpu.Stats
 	currCpu      *cpu.Stats
 	statsCounter int
@@ -112,36 +111,9 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 		return err
 	}
 
+	netStats := sysstats.NewNetworkStats()
+
 	buffer.SetLine2("")
-
-	{
-		ifaces, err := net.Interfaces()
-		if err != nil {
-			return err
-		}
-
-		ifaceList := []string{}
-		for _, iface := range ifaces {
-			addrs, err := iface.Addrs()
-			if err != nil {
-				return err
-			}
-
-			if iface.Name == "lo" || len(addrs) == 0 {
-				continue
-			}
-
-			addrsList := []string{}
-			for _, addr := range addrs {
-				if strings.HasPrefix(addr.String(), "fe80") {
-					continue
-				}
-				addrsList = append(addrsList, addr.String())
-			}
-			ifaceList = append(ifaceList, fmt.Sprintf("%s~%s", iface.Name, strings.Join(addrsList, ", ")))
-		}
-		buffer.SetLine4(strings.Join(ifaceList, " | "))
-	}
 
 	prevCpu, err := cpu.Get()
 	if err != nil {
@@ -164,6 +136,7 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 		prevCpu:      prevCpu,
 		currCpu:      currCpu,
 		statsCounter: statsCounter,
+		netStats:     netStats,
 	}
 
 	return nil
@@ -214,6 +187,8 @@ func runFn(kctx *kickstart.Context[AppHandler]) error {
 			usrCpu, sysCpu, idlCpu,
 			humanreadable.Second(uptime)),
 	)
+
+	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats.String())
 
 	if kctx.AppHandler.scanner.Scan() && kctx.AppHandler.scanner.Text() == CMD_PROMPT {
 		cmd := fmt.Sprintf("display:%s\n", kctx.AppHandler.buffer.NextRender())
