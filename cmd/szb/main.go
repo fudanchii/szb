@@ -7,12 +7,8 @@ import (
 	"time"
 
 	"github.com/fudanchii/szb/internal/display"
-	"github.com/fudanchii/szb/internal/humanreadable"
 	"github.com/fudanchii/szb/internal/kickstart"
 	"github.com/fudanchii/szb/internal/sysstats"
-	"github.com/mackerelio/go-osstat/cpu"
-	"github.com/mackerelio/go-osstat/memory"
-	"github.com/mackerelio/go-osstat/uptime"
 	"go.bug.st/serial"
 )
 
@@ -48,11 +44,9 @@ type AppHandler struct {
 	buffer  *display.Buffer
 	scanner *bufio.Scanner
 
-	datetime     *sysstats.DateTime
-	netStats     *sysstats.NetworkStats
-	prevCpu      *cpu.Stats
-	currCpu      *cpu.Stats
-	statsCounter int
+	datetime   *sysstats.DateTime
+	netStats   *sysstats.NetworkStats
+	aggregates *sysstats.Aggregates
 }
 
 func main() {
@@ -111,32 +105,21 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 		return err
 	}
 
+	aggregates, err := sysstats.NewAggregates()
+	if err != nil {
+		return err
+	}
+
 	netStats := sysstats.NewNetworkStats()
-
-	buffer.SetLine2("")
-
-	prevCpu, err := cpu.Get()
-	if err != nil {
-		return err
-	}
-
-	currCpu, err := cpu.Get()
-	if err != nil {
-		return err
-	}
-
-	statsCounter := 0
 
 	kctx.AppHandler = AppHandler{
 		tty:     tty,
 		buffer:  buffer,
 		scanner: scanner,
 
-		datetime:     timeDate,
-		prevCpu:      prevCpu,
-		currCpu:      currCpu,
-		statsCounter: statsCounter,
-		netStats:     netStats,
+		datetime:   timeDate,
+		netStats:   netStats,
+		aggregates: aggregates,
 	}
 
 	return nil
@@ -153,41 +136,8 @@ func shutdownFn(kctx *kickstart.Context[AppHandler]) error {
 
 func runFn(kctx *kickstart.Context[AppHandler]) error {
 	kctx.AppHandler.buffer.SetLine1(kctx.AppHandler.datetime.String())
-
-	cpuTotal := float64(kctx.AppHandler.currCpu.Total - kctx.AppHandler.prevCpu.Total)
-
-	usrCpu := float64(0)
-	sysCpu := float64(0)
-	idlCpu := float64(0)
-
-	if cpuTotal != 0 {
-		usrCpu = float64(kctx.AppHandler.currCpu.User-kctx.AppHandler.prevCpu.User) / cpuTotal * 100
-		sysCpu = float64(kctx.AppHandler.currCpu.System-kctx.AppHandler.prevCpu.System) / cpuTotal * 100
-		idlCpu = float64(kctx.AppHandler.currCpu.Idle-kctx.AppHandler.prevCpu.Idle) / cpuTotal * 100
-	}
-
-	memStat, err := memory.Get()
-	if err != nil {
-		return err
-	}
-
-	uptime, err := uptime.Get()
-	if err != nil {
-		return err
-	}
-
-	kctx.AppHandler.buffer.SetLine3(
-		fmt.Sprintf("mem.total:%s, mem.avail:%s, mem.cached:%s, mem.act:%s, mem.inact:%s, mem.free:%s, cpu.usr:%.1f%%, cpu.sys:%.1f%%, cpu.idle:%.1f%%, up:%v",
-			humanreadable.BiBytes(memStat.Total),
-			humanreadable.BiBytes(memStat.Available),
-			humanreadable.BiBytes(memStat.Cached),
-			humanreadable.BiBytes(memStat.Active),
-			humanreadable.BiBytes(memStat.Inactive),
-			humanreadable.BiBytes(memStat.Free),
-			usrCpu, sysCpu, idlCpu,
-			humanreadable.Second(uptime)),
-	)
-
+	kctx.AppHandler.buffer.SetLine2("")
+	kctx.AppHandler.buffer.SetLine3(kctx.AppHandler.aggregates.String())
 	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats.String())
 
 	if kctx.AppHandler.scanner.Scan() && kctx.AppHandler.scanner.Text() == CMD_PROMPT {
@@ -196,17 +146,6 @@ func runFn(kctx *kickstart.Context[AppHandler]) error {
 		kctx.AppHandler.tty.Write([]byte(cmd))
 
 		time.Sleep(DISPLAY_RATE_MS * time.Millisecond)
-	}
-
-	kctx.AppHandler.statsCounter++
-
-	if kctx.AppHandler.statsCounter >= (STATS_RATE_MS / DISPLAY_RATE_MS) {
-		kctx.AppHandler.prevCpu = kctx.AppHandler.currCpu
-		kctx.AppHandler.currCpu, err = cpu.Get()
-		if err != nil {
-			return err
-		}
-		kctx.AppHandler.statsCounter = 0
 	}
 
 	return nil
