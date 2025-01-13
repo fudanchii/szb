@@ -50,6 +50,7 @@ func (aggr *Aggregates) populateStatsInfo() {
 		aggr.prevCPUStats = aggr.currentCPUStats
 		aggr.currentCPUStats, _ = cpu.Get()
 		aggr.uptime, _ = uptime.Get()
+		aggr.memStats, _ = memory.Get()
 
 		time.Sleep(1 * time.Second)
 	}
