@@ -123,8 +123,8 @@ LOOP:
 		}
 	}
 
-	if err := app.afterLoopFn(&ctx); err != nil {
-		return err
+	if app.afterLoopFn != nil {
+		return app.afterLoopFn(&ctx)
 	}
 
 	return nil

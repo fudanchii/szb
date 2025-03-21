@@ -3,6 +3,7 @@ module github.com/fudanchii/szb
 go 1.23.3
 
 require (
+	github.com/briandowns/openweathermap v0.21.1
 	github.com/mackerelio/go-osstat v0.2.5
 	go.bug.st/serial v1.6.2
 )

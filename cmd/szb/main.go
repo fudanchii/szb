@@ -4,12 +4,17 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fudanchii/szb/internal/display"
 	"github.com/fudanchii/szb/internal/kickstart"
 	"github.com/fudanchii/szb/internal/sysstats"
+	"github.com/fudanchii/szb/internal/weather"
 	"go.bug.st/serial"
+
+	owm "github.com/briandowns/openweathermap"
 )
 
 const (
@@ -25,6 +30,8 @@ type configStruct struct {
 	overflowStyle          string
 	dayOfWeekDisplayPeriod int
 	timezone               string
+	coordLongitude         float64
+	coordLatitude          float64
 }
 
 var (
@@ -37,6 +44,26 @@ func init() {
 	flag.StringVar(&config.connectTo, "c", "/dev/ttyACM0", "Device name to connect to.")
 	flag.StringVar(&config.overflowStyle, "o", "wrap", "Overflow style when text line is longer than 20 characters.")
 	flag.StringVar(&config.timezone, "t", "UTC", "Timezone local to use when displaying date time.")
+
+	coordInput := ""
+	flag.StringVar(&coordInput, "x", "35.66017559963725,139.70039568656168", "Lat,Long coordinate for weather information, by default it's pointing to Shibuya.")
+	coords := strings.SplitN(coordInput, ",", 2)
+	if len(coords) != 2 {
+		panic("please input correct coordinate")
+	}
+
+	var err error
+
+	config.coordLatitude, err = strconv.ParseFloat(coords[0], 64)
+	if err != nil {
+		panic("invalid latitude value")
+	}
+
+	config.coordLongitude, err = strconv.ParseFloat(coords[1], 64)
+	if err != nil {
+		panic("invalid longitude value")
+	}
+
 }
 
 type AppHandler struct {
@@ -47,13 +74,14 @@ type AppHandler struct {
 	datetime   *sysstats.DateTime
 	netStats   *sysstats.NetworkStats
 	aggregates *sysstats.Aggregates
+	weatherer  *weather.Stats
 }
 
 func main() {
 	err := kickstart.
-		Init(setupFn).
-		Loop(runFn).
-		Then(shutdownFn).
+		Init(setup).
+		Loop(mainOperation).
+		Then(shutdown).
 		Exec()
 
 	if err != nil {
@@ -61,7 +89,7 @@ func main() {
 	}
 }
 
-func setupFn(kctx *kickstart.Context[AppHandler]) error {
+func setup(kctx *kickstart.Context[AppHandler]) error {
 	var (
 		buffer *display.Buffer
 	)
@@ -96,7 +124,7 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 
 	scanner.Split(bufio.ScanWords)
 
-	timeDate, err := sysstats.NewDateTime(
+	dateTime, err := sysstats.NewDateTime(
 		config.timezone,
 		DISPLAY_RATE_MS,
 		config.dayOfWeekDisplayPeriod,
@@ -112,20 +140,30 @@ func setupFn(kctx *kickstart.Context[AppHandler]) error {
 
 	netStats := sysstats.NewNetworkStats()
 
+	weatherer, err := weather.NewStats(&owm.Coordinates{
+		Latitude:  config.coordLatitude,
+		Longitude: config.coordLongitude,
+	})
+
+	if err != nil {
+		return err
+	}
+
 	kctx.AppHandler = AppHandler{
 		tty:     tty,
 		buffer:  buffer,
 		scanner: scanner,
 
-		datetime:   timeDate,
+		datetime:   dateTime,
 		netStats:   netStats,
 		aggregates: aggregates,
+		weatherer:  weatherer,
 	}
 
 	return nil
 }
 
-func shutdownFn(kctx *kickstart.Context[AppHandler]) error {
+func shutdown(kctx *kickstart.Context[AppHandler]) error {
 	defer kctx.AppHandler.tty.Close()
 
 	fmt.Println("Shutting down...")
@@ -134,9 +172,9 @@ func shutdownFn(kctx *kickstart.Context[AppHandler]) error {
 	return nil
 }
 
-func runFn(kctx *kickstart.Context[AppHandler]) error {
+func mainOperation(kctx *kickstart.Context[AppHandler]) error {
 	kctx.AppHandler.buffer.SetLine1(kctx.AppHandler.datetime.String())
-	kctx.AppHandler.buffer.SetLine2("")
+	kctx.AppHandler.buffer.SetLine2(kctx.AppHandler.weatherer.String())
 	kctx.AppHandler.buffer.SetLine3(kctx.AppHandler.aggregates.String())
 	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats.String())
 
