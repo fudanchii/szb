@@ -3,6 +3,7 @@ package display
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -16,6 +17,7 @@ type OverflowStyle interface {
 	ImplOverflowStyle()
 
 	NextRender(*CharLcdBuffer) []byte
+
 	setLine1(string)
 	setLine2(string) error
 	setLine3(string) error
@@ -95,8 +97,8 @@ func (BaseNoWrapOverflowStyle) ImplNoWrapOverflowStyle() {}
 type OfEndlessMarquee struct {
 	BaseNoWrapOverflowStyle
 
-	line     string
-	nextLine string
+	line     []byte
+	nextLine []byte
 	pos      int
 
 	counter, rate int
@@ -110,14 +112,14 @@ func (oem *OfEndlessMarquee) NextRender(currentBuffer []byte) {
 	}
 
 	oem.counter = 0
-	trailer := ""
+	trailer := []byte{}
 	endPos := oem.pos + 20
 	if endPos >= len(oem.line) {
 		endPos = len(oem.line)
 		trailer = oem.nextLine[:20-(endPos-oem.pos)]
 	}
 
-	copy(currentBuffer[:], []byte(oem.line[oem.pos:endPos]+trailer))
+	copy(currentBuffer[:], slices.Concat([]byte(oem.line[oem.pos:endPos]), []byte(trailer)))
 
 	oem.pos += 1
 	if oem.pos == len(oem.line) {
@@ -133,7 +135,7 @@ func (oem *OfEndlessMarquee) setCurrentLine(line string) {
 		line += " . "
 	}
 
-	oem.nextLine = fmt.Sprintf("%-20s", line)
+	oem.nextLine = ReplaceRuneWithLCDCharMap(fmt.Sprintf("%-20s", line))
 	if len(oem.line) == 0 {
 		oem.line = oem.nextLine
 		oem.pos = 0
@@ -144,8 +146,8 @@ type OfCycleMarquee struct {
 	BaseNoWrapOverflowStyle
 
 	slideLeft         bool
-	line              string
-	nextLine          string
+	line              []byte
+	nextLine          []byte
 	pos               int
 	changed, rendered bool
 
@@ -195,7 +197,7 @@ func (ocm *OfCycleMarquee) NextRender(currentBuffer []byte) {
 }
 
 func (ocm *OfCycleMarquee) setCurrentLine(line string) {
-	ocm.nextLine = fmt.Sprintf("%-20s", line)
+	ocm.nextLine = ReplaceRuneWithLCDCharMap(fmt.Sprintf("%-20s", line))
 	ocm.changed = true
 
 	if len(ocm.line) == 0 {
@@ -209,7 +211,7 @@ func (ocm *OfCycleMarquee) setCurrentLine(line string) {
 type OfTrimLine struct {
 	BaseNoWrapOverflowStyle
 
-	line    string
+	line    []byte
 	changed bool
 }
 
@@ -221,7 +223,7 @@ func (otl *OfTrimLine) NextRender(currentBuffer []byte) {
 }
 
 func (otl *OfTrimLine) setCurrentLine(line string) {
-	otl.line = fmt.Sprintf("%-20s", line)
+	otl.line = ReplaceRuneWithLCDCharMap(fmt.Sprintf("%-20s", line))
 	otl.changed = true
 }
 
@@ -274,7 +276,7 @@ func (ocsp *OfCustomStylePerLine) setLine4(line string) error {
 type OfWrapSpanLines struct {
 	BaseOverflowStyle
 
-	line     string
+	line     []byte
 	lchanged bool
 }
 
@@ -283,10 +285,6 @@ func NewOverflowWrapSpanLines() *OfWrapSpanLines {
 }
 
 func (owl *OfWrapSpanLines) NextRender(currentBuffer *CharLcdBuffer) []byte {
-	if len(owl.line) < CharLcdDimension {
-		owl.setLine1(owl.line)
-	}
-
 	if owl.lchanged {
 		bytes := []byte(owl.line)[:CharLcdDimension]
 
@@ -304,7 +302,7 @@ func (owl *OfWrapSpanLines) NextRender(currentBuffer *CharLcdBuffer) []byte {
 }
 
 func (owl *OfWrapSpanLines) setLine1(line string) {
-	owl.line = fmt.Sprintf("%-[1]*s", CharLcdDimension, line)
+	owl.line = ReplaceRuneWithLCDCharMap(fmt.Sprintf("%-[1]*s", CharLcdDimension, line))
 	owl.lchanged = true
 }
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -179,9 +180,9 @@ func mainOperation(kctx *kickstart.Context[AppHandler]) error {
 	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats.String())
 
 	if kctx.AppHandler.scanner.Scan() && kctx.AppHandler.scanner.Text() == CMD_PROMPT {
-		cmd := fmt.Sprintf("display:%s\n", kctx.AppHandler.buffer.NextRender())
-
-		kctx.AppHandler.tty.Write([]byte(cmd))
+		kctx.AppHandler.tty.Write(
+			slices.Concat([]byte("display:"), kctx.AppHandler.buffer.NextRender(), []byte("\n")),
+		)
 
 		time.Sleep(DISPLAY_RATE_MS * time.Millisecond)
 	}

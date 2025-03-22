@@ -71,7 +71,7 @@ func (s *Stats) String() string {
 		descLen := len(desc)
 		return fmt.Sprintf("%*s", 20, fmt.Sprintf("%*s", -(((20-descLen)/2)+descLen), desc))
 	case "temp":
-		temp := fmt.Sprintf("%.1f'C", s.current.Main.Temp)
+		temp := fmt.Sprintf("%.1fºC", s.current.Main.Temp)
 		tempLen := len(temp)
 		return fmt.Sprintf("%*s", 20, fmt.Sprintf("%*s", -(((20-tempLen)/2)+tempLen), temp))
 	}
