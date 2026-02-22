@@ -323,18 +323,18 @@ func (db *Buffer) NextRender() []byte {
 	return db.overflowContext.NextRender(&db.internal)
 }
 
-func (db *Buffer) SetLine1(line string) {
-	db.overflowContext.setLine1(line)
+func (db *Buffer) SetLine1(line fmt.Stringer) {
+	db.overflowContext.setLine1(line.String())
 }
 
-func (db *Buffer) SetLine2(line string) error {
-	return db.overflowContext.setLine2(line)
+func (db *Buffer) SetLine2(line fmt.Stringer) error {
+	return db.overflowContext.setLine2(line.String())
 }
 
-func (db *Buffer) SetLine3(line string) error {
-	return db.overflowContext.setLine3(line)
+func (db *Buffer) SetLine3(line fmt.Stringer) error {
+	return db.overflowContext.setLine3(line.String())
 }
 
-func (db *Buffer) SetLine4(line string) error {
-	return db.overflowContext.setLine4(line)
+func (db *Buffer) SetLine4(line fmt.Stringer) error {
+	return db.overflowContext.setLine4(line.String())
 }

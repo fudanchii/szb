@@ -174,10 +174,10 @@ func shutdown(kctx *kickstart.Context[AppHandler]) error {
 }
 
 func mainOperation(kctx *kickstart.Context[AppHandler]) error {
-	kctx.AppHandler.buffer.SetLine1(kctx.AppHandler.datetime.String())
-	kctx.AppHandler.buffer.SetLine2(kctx.AppHandler.weatherer.String())
-	kctx.AppHandler.buffer.SetLine3(kctx.AppHandler.aggregates.String())
-	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats.String())
+	kctx.AppHandler.buffer.SetLine1(kctx.AppHandler.datetime)
+	kctx.AppHandler.buffer.SetLine2(kctx.AppHandler.weatherer)
+	kctx.AppHandler.buffer.SetLine3(kctx.AppHandler.aggregates)
+	kctx.AppHandler.buffer.SetLine4(kctx.AppHandler.netStats)
 
 	if kctx.AppHandler.scanner.Scan() && kctx.AppHandler.scanner.Text() == CMD_PROMPT {
 		kctx.AppHandler.tty.Write(
